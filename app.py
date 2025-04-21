@@ -4,10 +4,10 @@ import streamlit as st
 
 # Page config
 st.set_page_config(page_title="AI Student Success Dashboard", layout="wide")
-st.title("🎓 AI-Driven Student Success Dashboard")
+st.title("📊 AI-Driven Student Success Dashboard")
 
 # Sidebar upload
-st.sidebar.header("Upload Student CSV File")
+st.sidebar.header("📁 Upload Student CSV File")
 uploaded_file = st.sidebar.file_uploader("Choose a CSV file", type=["csv"])
 
 if uploaded_file:
@@ -52,48 +52,59 @@ def predict_risk(row):
     if row["Attendance_%"] < 70: score += 1
     if row["LMS_Logins"] < 10: score += 1
     if row["Financial_Risk"] == 1: score += 1
+    return score
 
-    if score >= 3:
-        return "High"
-    elif score == 2:
-        return "Medium"
-    else:
-        return "Low"
-
-df["Dropout_Risk"] = df.apply(predict_risk, axis=1)
+df["Risk_Score"] = df.apply(predict_risk, axis=1)
+df["Dropout_Risk"] = df["Risk_Score"].apply(lambda x: "High" if x >= 3 else "Medium" if x == 2 else "Low")
 
 # Sentiment Analysis
 df["Sentiment_Score"] = df["Messages"].apply(lambda x: TextBlob(x).sentiment.polarity)
 df["Sentiment"] = df["Sentiment_Score"].apply(lambda x: "Negative" if x < 0 else "Positive")
 
-# Advisor Alerts
-df["Alert"] = df.apply(lambda x: "⚠️ Advisor Follow-up" if x["Dropout_Risk"] == "High" or x["Sentiment"] == "Negative" else "✓ OK", axis=1)
+# Recommendations
+def get_recommendation(row):
+    recs = []
+    if row["GPA"] < 2.5:
+        recs.append("📚 Academic tutoring")
+    if row["Attendance_%"] < 70:
+        recs.append("🕒 Attendance counseling")
+    if row["LMS_Logins"] < 10:
+        recs.append("💻 LMS engagement support")
+    if row["Financial_Risk"] == 1:
+        recs.append("💰 Financial aid check-in")
+    if row["Sentiment"] == "Negative":
+        recs.append("🧠 Mental health referral")
+    return ", ".join(recs)
+
+df["Recommendations"] = df.apply(get_recommendation, axis=1)
+df["Alert"] = df.apply(lambda x: "⚠️ Advisor Action" if x["Dropout_Risk"] == "High" or x["Sentiment"] == "Negative" else "✓ OK", axis=1)
 
 # Filters
-high_risk = df[df["Dropout_Risk"] == "High"]
-negative_sentiment = df[df["Sentiment"] == "Negative"]
-alerts = df[df["Alert"] == "⚠️ Advisor Follow-up"]
+summary_cols = ["Student_ID", "GPA", "Attendance_%", "Dropout_Risk"]
+high_risk = df[df["Dropout_Risk"] == "High"][summary_cols]
+negative_sentiment = df[df["Sentiment"] == "Negative"][summary_cols + ["Sentiment"]]
+alerts = df[df["Alert"] == "⚠️ Advisor Action"][summary_cols + ["Sentiment", "Alert", "Recommendations"]]
 
-# Quadrant Layout
-st.subheader("📊 Quadrant View of Student Insights")
+# Sexy Quadrant Layout
+st.subheader("📈 Student Insights Overview")
 col1, col2 = st.columns(2)
 col3, col4 = st.columns(2)
 
 with col1:
-    st.markdown("### 🧑‍🎓 All Students")
-    st.dataframe(df)
+    st.markdown("### 👥 All Students (Summary)")
+    st.dataframe(df[summary_cols])
 
 with col2:
-    st.markdown("### 🔥 High-Risk Students")
+    st.markdown("### 🔥 High Risk")
     st.dataframe(high_risk)
 
 with col3:
-    st.markdown("### 💬 Negative Sentiment")
+    st.markdown("### 😟 Negative Sentiment")
     st.dataframe(negative_sentiment)
 
 with col4:
-    st.markdown("### 🚨 Advisor Follow-up Alerts")
+    st.markdown("### 🚨 Advisor Alerts & Suggestions")
     st.dataframe(alerts)
 
-# Optional download
-st.download_button("📥 Download At-Risk Students", alerts.to_csv(index=False), "at_risk_students.csv", "text/csv")
+# Download button
+st.download_button("📥 Download Alerts", alerts.to_csv(index=False), "advisor_alerts.csv", "text/csv")
