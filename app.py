@@ -1,19 +1,19 @@
-# app.py
 import pandas as pd
 from textblob import TextBlob
 import streamlit as st
 
-# Page title
+# Page config
+st.set_page_config(page_title="AI Student Success Dashboard", layout="wide")
 st.title("🎓 AI-Driven Student Success Dashboard")
 
-# Load data (use sample or upload CSV)
-st.sidebar.header("Upload Your Student CSV File")
-uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+# Sidebar upload
+st.sidebar.header("Upload Student CSV File")
+uploaded_file = st.sidebar.file_uploader("Choose a CSV file", type=["csv"])
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
 else:
-    st.info("No file uploaded. Using sample data.")
+    st.info("Using sample data as no file was uploaded.")
     data = {
         "Student_ID": range(1, 21),
         "GPA": [2.9, 3.5, 1.8, 3.0, 2.2, 2.7, 3.8, 1.9, 2.3, 3.1, 3.6, 2.5, 1.7, 2.0, 3.4, 2.8, 3.2, 2.1, 1.6, 2.9],
@@ -45,7 +45,7 @@ else:
     }
     df = pd.DataFrame(data)
 
-# Dropout Risk Scoring
+# Dropout Risk Prediction
 def predict_risk(row):
     score = 0
     if row["GPA"] < 2.5: score += 1
@@ -66,18 +66,34 @@ df["Dropout_Risk"] = df.apply(predict_risk, axis=1)
 df["Sentiment_Score"] = df["Messages"].apply(lambda x: TextBlob(x).sentiment.polarity)
 df["Sentiment"] = df["Sentiment_Score"].apply(lambda x: "Negative" if x < 0 else "Positive")
 
-# Advisor Alert
-df["Alert"] = df.apply(
-    lambda x: "⚠️ Advisor Follow-up" if x["Dropout_Risk"] == "High" or x["Sentiment"] == "Negative" else "✓ OK", axis=1
-)
+# Advisor Alerts
+df["Alert"] = df.apply(lambda x: "⚠️ Advisor Follow-up" if x["Dropout_Risk"] == "High" or x["Sentiment"] == "Negative" else "✓ OK", axis=1)
 
-# Main Dashboard
-st.subheader("📊 Student Overview")
-st.dataframe(df)
+# Filters
+high_risk = df[df["Dropout_Risk"] == "High"]
+negative_sentiment = df[df["Sentiment"] == "Negative"]
+alerts = df[df["Alert"] == "⚠️ Advisor Follow-up"]
 
-st.subheader("⚠️ At-Risk Students")
-at_risk_df = df[df["Alert"] == "⚠️ Advisor Follow-up"]
-st.dataframe(at_risk_df)
+# Quadrant Layout
+st.subheader("📊 Quadrant View of Student Insights")
+col1, col2 = st.columns(2)
+col3, col4 = st.columns(2)
 
-# Download filtered results
-st.download_button("📥 Download At-Risk Students", at_risk_df.to_csv(index=False), "at_risk_students.csv", "text/csv")
+with col1:
+    st.markdown("### 🧑‍🎓 All Students")
+    st.dataframe(df)
+
+with col2:
+    st.markdown("### 🔥 High-Risk Students")
+    st.dataframe(high_risk)
+
+with col3:
+    st.markdown("### 💬 Negative Sentiment")
+    st.dataframe(negative_sentiment)
+
+with col4:
+    st.markdown("### 🚨 Advisor Follow-up Alerts")
+    st.dataframe(alerts)
+
+# Optional download
+st.download_button("📥 Download At-Risk Students", alerts.to_csv(index=False), "at_risk_students.csv", "text/csv")
